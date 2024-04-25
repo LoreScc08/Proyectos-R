@@ -1,0 +1,92 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='hh:mm:ss TT';
+SET DateFormat='DD/MM/YY';
+SET TimestampFormat='DD/MM/YY hh:mm:ss[.fff] TT';
+SET MonthNames='Ene;Feb;Mar;Abr;May;Jun;Jul;Ago;Sep;Oct;Nov;Dic';
+SET DayNames='Lun;Mar;Mié;Jue;Vie;Sáb;Dom';
+
+
+//set fechaini='20160601';
+//set fechafin='20160628';
+SET fechaini=$(FechaInicial);
+SET fechafin=$(FechaFinal);
+set depto=0;
+set area2='';
+set seccionmas='';
+set numseccion=0;
+set pais='';
+set areacp='';
+
+for i=1 to 2
+
+
+if i=1 then
+depto=3;
+area2='Operacion Tienda';
+seccionmas='MAS TIENDAS';
+numseccion=1;
+entra=0;
+entrada=0;
+inc='02';
+pais=1;
+tip=72;
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+if i=2 then
+depto=3;
+area2='Operacion Tienda';
+seccionmas='MAS TIENDAS';
+numseccion=1;
+entra=0;
+entrada=0;
+inc='03';
+pais=1;
+tip=72;
+ODBC CONNECT32 TO [MensajeroPrimavera];
+end if
+
+
+
+/////Mensajeros
+SELECT 
+	a.operadoratencion,
+	horainicio::date as fecha,
+	(date_part('week',horainicio::date)) as semana,
+	'$(area2)' as Area, 
+	'$(Zona)' as Zona,
+	count(*) as TotalMensajeros,
+	sum(CASE WHEN (preg1)='B' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Bien,
+	sum(CASE WHEN (preg1)='C' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Mal,
+	sum(CASE WHEN (preg1)='A' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Omitir,
+	sum(CASE WHEN (preg2)='B' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Insatisfecho,
+	sum(CASE WHEN (preg2)='C' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Regular,
+	sum(CASE WHEN (preg2)='D' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Satisfecho,
+	sum(CASE WHEN (preg2)='A' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Omitir_2,
+	sum(CASE WHEN (preg3)='B' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Bien_3,
+	sum(CASE WHEN (preg3)='C' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Mal_3,
+	sum(CASE WHEN (preg3)='A' and campania in (2,3) THEN 1 ELSE 0 END) as TotalEncuestas_Omitir_3
+	
+FROM 
+	msjsolicitud as a
+	left join msjrespuestasencuestas as b on a.keyx=b.keyxorigen and a.departamento=b.clase
+	
+WHERE 
+	horainicio::date between '$(fechaini)' and '$(fechafin)' 
+	and departamento='$(depto)' 
+	and opc_heredado=0
+	and (horafinal-horainicio)>'00:01:00' 
+	and texto not like '<%'
+	and semaforo=101
+GROUP BY 
+	horainicio::date,
+	(date_part('week',fecharesponde::date)),
+	operadoratencion;
+	
+NEXT
+
+
