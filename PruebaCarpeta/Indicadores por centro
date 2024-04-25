@@ -1,0 +1,267 @@
+/// PARA LA RENDICIÓN DE CUENTAS
+
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='hh:mm:ss TT';
+SET DateFormat='DD/MM/YYYY';
+SET TimestampFormat='DD/MM/YYYY hh:mm:ss[.fff] TT';
+SET MonthNames='Ene;Feb;Mar;Abr;May;Jun;Jul;Ago;Sep;Oct;Nov;Dic';
+SET DayNames='Lun;Mar;Mié;Jue;Vie;Sáb;Dom';
+
+for i=1 to 3
+
+if i=1 then
+depto=3;
+area2='Operacion Tienda';
+centro='230185';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+if i=2 then
+depto=6;
+area2='Movimientos al Inventario';
+centro='230183';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+if i=3 then
+depto=8;
+area2='Venta/Postventa';
+centro='231921';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+
+SELECT distinct(a.operadoratencion)as operadoratencion,
+(b.nombre||' '||b.apellidopaterno||' '||b.apellidomaterno) as nombre,
+count(*) as Numero_de_Mensajeros,
+(sum(CASE WHEN a.TEXTO LIKE '%> *%'   THEN 1 ELSE 0 END))as Numero_de_Mensajeros_Privada,
+((sum(CASE WHEN  ((horafinal-horainicio)/(case when a.incidencias>0 then a.incidencias else 1 end)<'00:15:00')THEN 1 ELSE 0 END))) as cumple_solucion,
+'$(area2)' as Area,
+'$(centro)' as centro
+FROM  msjsolicitud as a, msjempleado as b
+WHERE a.horainicio::date 
+BETWEEN '$(fechaini)' AND '$(fechafin)'
+and a.operadoratencion=b.numeroempleado
+and (a.horafinal-a.horainicio)>= '00:01:00'
+and a.semaforo=101
+AND a.departamento='$(depto)'
+and centro in (231921,230183,230185)
+group by a.operadoratencion,(b.nombre||' '||b.apellidopaterno||' '||b.apellidomaterno),b.fecha 
+order by a.operadoratencion;
+
+
+SELECT  distinct(a.operadoratencion) as operadoratencion, 
+'$(area2)' as Area, a.departamento,
+(e.nombre||' '||e.apellidopaterno||' '||e.apellidomaterno) as nombre,
+sum(CASE WHEN (preg1)='A' THEN 1 ELSE 0 END) AS SI_V1,
+sum(CASE WHEN (preg1)='B' THEN 1 ELSE 0 END) as NO_V1
+FROM  msjsolicitud  as a,msjrespuestasencuestas as b, msjempleado as e
+WHERE a.keyx=b.keyxorigen 
+AND a.departamento=b.clase
+AND a.operadoratencion=b.empleadomas
+AND a.departamento='$(depto)'
+AND a.semaforo=101
+and a.opc_heredado=0
+and b.fecharesponde>='2021-02-11' 
+AND b.preg1!=''
+AND b.empleadomas=e.numeroempleado
+AND a.operadoratencion=e.numeroempleado
+and centro in (231921,230183,230185)
+GROUP BY  a.departamento, a.operadoratencion,e.nombre,e.apellidopaterno,e.apellidomaterno;
+
+SELECT  distinct(a.operadoratencion) as operadoratencion, 
+'$(area2)' as Area, a.departamento,
+(e.nombre||' '||e.apellidopaterno||' '||e.apellidomaterno) as nombre,
+sum(CASE WHEN (preg1)='B' THEN 1 ELSE 0 END) AS SI_V2,
+sum(CASE WHEN (preg1)='C' THEN 1 ELSE 0 END) as NO_V2
+FROM  msjsolicitud  as a,msjrespuestasencuestas as b, msjempleado as e
+WHERE a.keyx=b.keyxorigen 
+AND a.departamento=b.clase
+AND a.operadoratencion=b.empleadomas
+AND a.departamento='$(depto)'
+AND a.semaforo=101
+and a.opc_heredado=0
+and b.fecharesponde>='2021-02-11' 
+AND b.preg1!=''
+AND b.empleadomas=e.numeroempleado
+AND a.operadoratencion=e.numeroempleado
+and centro in (231921,230183,230185)
+GROUP BY  a.departamento, a.operadoratencion,e.nombre,e.apellidopaterno,e.apellidomaterno;
+
+SELECT distinct(a.operadoratencion)as operadoratencion,
+'$(area2)'as Area,
+'$(centro)' as centro,
+count(distinct(a.keyx)) as numero_de_reincidenciasdetalledetalle
+from   msjsolicitud as a, msjempleado as b, msjsolicitud as c
+ where 
+a.operadoratencion=b.numeroempleado
+and a.semaforo=101
+and a.horainicio::date between '$(fechaini)' AND '$(fechafin)'
+and c.semaforo=101
+and c.horainicio::date between '$(fechaini)' AND '$(fechafin)'
+and a.iptienda=c.iptienda
+and a.tienda=c.tienda
+and c.horaatiende between 
+(select  min (f.horafinal) from msjsolicitud as f where f.operadoratencion=a.operadoratencion and f.horainicio::date  between '$(fechaini)' AND '$(fechafin)' and f.iptienda=a.iptienda and f.tienda=a.tienda and a.semaforo=101 and f.horainicio=a.horainicio ) 
+and 
+(select  min (d.horafinal) + interval '3 minutes' from msjsolicitud as d where d.operadoratencion=a.operadoratencion and d.horainicio::date  between '$(fechaini)' AND '$(fechafin)' and d.iptienda=a.iptienda and d.semaforo=101  and d.tienda=a.tienda and d.horainicio=a.horainicio)
+and c.horainicio::date=a.horainicio::date
+and c.horaatiende>a.horafinal
+and a.departamento='$(depto)'
+and a.departamento=c.departamento
+and centro not in (230462,234090)
+and (a.horafinal-a.horainicio) >= '00:01:01.0000'
+and (c.horafinal-c.horainicio) >= '00:01:01.0000'
+group by a.operadoratencion
+order by a.operadoratencion;
+
+Next
+
+for i=1 to 3
+
+
+if i=1 then
+depto=3;
+area2='Operacion Tienda';
+centro='230462';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+if i=2 then
+depto=6;
+area2='Movimientos al Inventario';
+centro='230462';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+if i=3 then
+depto=8;
+area2='Venta/Postventa';
+centro='230462';
+ODBC CONNECT32 TO [Mensajero Obregon];
+end if
+
+
+
+SELECT distinct(a.operadoratencion)as operadoratencion,
+			(b.nombre||' '||b.apellidopaterno||' '||b.apellidomaterno) as nombre,
+			count(*) as Numero_de_Mensajeros,
+			(sum(CASE WHEN a.TEXTO LIKE '%> *%'   THEN 1 ELSE 0 END))as Numero_de_Mensajeros_Privada,
+			((sum(CASE WHEN  ((horafinal-horainicio)/(case when a.incidencias>0 then a.incidencias else 1 end)<'00:15:00')THEN 1 ELSE 0 END))) as cumple_solucion,
+			'$(area2)' as Area,
+			'$(centro)' as centro
+			
+FROM 
+		 msjsolicitud as a, msjempleado as b
+		 
+WHERE
+		 a.horainicio::date 
+BETWEEN 		'$(fechaini)' AND '$(fechafin)'
+				and a.operadoratencion=b.numeroempleado
+				and (a.horafinal-a.horainicio)>= '00:01:00'
+				and a.semaforo=101
+				AND a.departamento='$(depto)'
+				and opc_heredado=0
+							
+group by a.operadoratencion,(b.nombre||' '||b.apellidopaterno||' '||b.apellidomaterno),b.fecha 
+order by a.operadoratencion;
+
+
+SELECT  distinct(a.operadoratencion) as operadoratencion, 
+'$(area2)' as Area, a.departamento,
+(e.nombre||' '||e.apellidopaterno||' '||e.apellidomaterno) as nombre,
+
+sum(CASE WHEN (preg1)='A' THEN 1 ELSE 0 END) AS SI_V1, ///////encuestas
+sum(CASE WHEN (preg1)='B' THEN 1 ELSE 0 END) as NO_V1
+
+FROM  
+		msjsolicitud  as a,msjrespuestasencuestas as b, msjempleado as e
+
+
+WHERE a.keyx=b.keyxorigen 
+AND a.departamento=b.clase
+AND a.operadoratencion=b.empleadomas
+AND a.departamento='$(depto)'
+AND a.semaforo=101
+and a.opc_heredado=0
+and b.fecharesponde>='2021-02-11' 
+AND b.preg1!=''
+AND b.empleadomas=e.numeroempleado
+AND a.operadoratencion=e.numeroempleado
+and centro in (230462)
+GROUP BY  a.departamento, a.operadoratencion,e.nombre,e.apellidopaterno,e.apellidomaterno;
+
+SELECT  distinct(a.operadoratencion) as operadoratencion, 
+'$(area2)' as Area, a.departamento,
+(e.nombre||' '||e.apellidopaterno||' '||e.apellidomaterno) as nombre,
+sum(CASE WHEN (preg1)='B' THEN 1 ELSE 0 END) AS SI_V2,
+sum(CASE WHEN (preg1)='C' THEN 1 ELSE 0 END) as NO_V2
+FROM  msjsolicitud  as a,msjrespuestasencuestas as b, msjempleado as e
+WHERE a.keyx=b.keyxorigen 
+AND a.departamento=b.clase
+AND a.operadoratencion=b.empleadomas
+AND a.departamento='$(depto)'
+AND a.semaforo=101
+and a.opc_heredado=0
+and b.fecharesponde>='2021-02-11' 
+AND b.preg1!=''
+AND b.empleadomas=e.numeroempleado
+AND a.operadoratencion=e.numeroempleado
+GROUP BY  a.departamento, a.operadoratencion,e.nombre,e.apellidopaterno,e.apellidomaterno;
+
+SELECT distinct(a.operadoratencion)as operadoratencion,
+'$(area2)'as Area,
+'$(centro)' as centro,
+count(distinct(a.keyx)) as numero_de_reincidenciasdetalledetalle
+from   msjsolicitud as a, msjempleado as b, msjsolicitud as c
+ where 
+a.operadoratencion=b.numeroempleado
+and a.semaforo=101
+and a.horainicio::date between '$(fechaini)' AND '$(fechafin)'
+and c.semaforo=101
+and c.horainicio::date between '$(fechaini)' AND '$(fechafin)'
+and a.iptienda=c.iptienda
+and a.tienda=c.tienda
+and c.horaatiende between 
+(select  min (f.horafinal) from msjsolicitud as f where f.operadoratencion=a.operadoratencion and f.horainicio::date  between '$(fechaini)' AND '$(fechafin)' and f.iptienda=a.iptienda and f.tienda=a.tienda and a.semaforo=101 and f.horainicio=a.horainicio ) 
+and 
+(select  min (d.horafinal) + interval '3 minutes' from msjsolicitud as d where d.operadoratencion=a.operadoratencion and d.horainicio::date  between '$(fechaini)' AND '$(fechafin)' and d.iptienda=a.iptienda and d.semaforo=101  and d.tienda=a.tienda and d.horainicio=a.horainicio)
+and c.horainicio::date=a.horainicio::date
+and c.horaatiende>a.horafinal
+and a.departamento='$(depto)'
+and a.departamento=c.departamento
+and (a.horafinal-a.horainicio) >= '00:01:01.0000'
+and (c.horafinal-c.horainicio) >= '00:01:01.0000'
+group by a.operadoratencion
+order by a.operadoratencion;
+
+Next
+
+
+ODBC CONNECT32 TO [IncidenciasM];
+
+select distinct(empleadoevaluado)as operadoratencion,
+				centroempleado as centro,
+				avg(calificacion) as HE,
+				avg(calificacionpto) as puntualidad,
+				calificacionpto,
+				sum(case when calificacionpto=3 then 1 else 0 end) as cumple_puntualidad,
+			    sum(case when calificacionpto in (3,1) then 1 else 0 end) as puntualidad_total
+
+from 
+		masevaluaciongeneral as a, masevaluaciondetalle as b 
+
+where		anioevaluar=date_part('year',  '$(fechaini)'::Date)
+		and mesevaluacion=date_part('month',  '$(fechaini)'::date)
+		and calificacion <>0
+		and calificacionpto<>0
+		and a.keyx=b.keyxgeneral
+		and keyxcatalogo=1
+
+group by empleadoevaluado, centroempleado, 	calificacionpto
+order by centroempleado, empleadoevaluado;
+
