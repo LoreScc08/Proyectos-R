@@ -1,0 +1,74 @@
+SET ThousandSep=',';
+SET DecimalSep='.';
+SET MoneyThousandSep=',';
+SET MoneyDecimalSep='.';
+SET MoneyFormat='$#,##0.00;-$#,##0.00';
+SET TimeFormat='hh:mm:ss TT';
+SET DateFormat='DD/MM/YYYY';
+SET TimestampFormat='YYYY/MM/DD hh:mm:ss[.fff] TT';
+SET MonthNames='Enero;Febrero;Marzo;Abril;Mayo;Junio;Julio;Agosto;Septiembre;Octubre;Noviembre;Diciembre';
+SET MonthName='Enero;Febrero;Marzo;Abril;Mayo;Junio;Julio;Agosto;Septiembre;Octubre;Noviembre;Diciembre';
+SET DayNames='Lun;Mar;Mié;Jue;Vie;Sáb;Dom';
+
+//set fechaini='20160701';
+//set fechafin='20160731';
+SET fechaini=$(FechaInicial);
+SET fechafin=$(FechaFinal);
+set depto=0;
+set numdepartamento=0;
+set application=0;
+set area2='';
+set area='';
+set seccionmas='';
+set numseccion='';
+set pais=0;
+set entra=0;
+set entrada=0;
+set areacp='';
+set seccion='';
+set centro=0;
+
+ODBC CONNECT32 TO Sistemas2007;
+
+
+select empleado as empleadoUP, tienda as tiendaUP,
+*
+from 
+	descuentosistemas 
+where 
+
+fecha::date between '$(fechaini)' and '$(fechafin)'
+
+and flaggrabado=1 and tienda<>'0'
+ 
+ ;
+
+
+ODBC CONNECT TO [utilería web];
+
+
+SELECT 
+empleado as colaborador, tienda as tiendauti,
+* 
+from 
+	tdcambios  
+where 
+	query ilike '%update mudescm%'
+and 
+	fechamovto::date between '$(fechaini)' and '$(fechafin)'
+;
+
+
+SELECT 
+empleado as colaborador, tienda as tiendauti,
+* 
+from 
+	tdcambios
+where 
+	query ilike '%update muinvent%'  
+and 
+	fechamovto::date between '$(fechaini)' and '$(fechafin)'
+and query ilike '%Importe%'
+
+;
+
